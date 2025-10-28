@@ -93,7 +93,11 @@ fun HomeScreen(
         },
         floatingActionButton = {
             Column {
-                DeleteTaskFloatingButton(onClick = { showDeleteDialog = true })
+                if (areCompletedTasks.value.isNotEmpty()) {
+                    DeleteTaskFloatingButton(onClick = {
+                        showDeleteDialog = true
+                    })
+                }
                 Spacer(Modifier.height(12.dp))
                 AddTaskFloatingButton(onFloatingButtonClick)
             }
