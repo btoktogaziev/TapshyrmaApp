@@ -80,6 +80,8 @@ fun HomeScreen(
         TaskFilter.COMPLETED -> taskViewModel.getTasksByStatus(isCompleted = true)
             .observeAsState(emptyList())
     }
+    val areCompletedTasks =
+        taskViewModel.getTasksByStatus(isCompleted = true).observeAsState(emptyList())
 
     Scaffold(
         topBar = {
