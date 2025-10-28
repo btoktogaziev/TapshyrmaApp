@@ -162,7 +162,8 @@ fun TaskList(
     val animatedBrush = animatedBorderBrush()
     LazyColumn(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = 140.dp)
     ) {
         items(taskModels) { task ->
             Row(
