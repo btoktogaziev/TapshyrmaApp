@@ -1,13 +1,13 @@
-package com.example.tapshyrmaapp.data.database.dao
+package com.example.tapshyrmaapp.data.local.database.dao
 
-import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import com.example.tapshyrmaapp.data.database.entity.TaskModel
+import com.example.tapshyrmaapp.data.local.database.entity.TaskModel
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
@@ -15,13 +15,13 @@ interface TaskDao {
     suspend fun insertTask(taskModel: TaskModel)
 
     @Query("SELECT * FROM taskModel ")
-    fun getAllTasks(): LiveData<List<TaskModel>>
+    fun getAllTasks(): Flow<List<TaskModel>>
 
     @Query("SELECT * FROM taskModel WHERE is_completed = :isCompleted")
-    fun getTasksByStatus(isCompleted: Boolean): LiveData<List<TaskModel>>
+    fun getTasksByStatus(isCompleted: Boolean): Flow<List<TaskModel>>
 
     @Query("SELECT * FROM taskModel WHERE id =:id")
-    suspend fun getTaskById(id: Int): TaskModel?
+    fun getTaskById(id: Int): Flow<TaskModel?>
 
     @Update
     suspend fun updateTask(taskModel: TaskModel)

@@ -1,4 +1,4 @@
-package com.example.tapshyrmaapp.data.database.entity
+package com.example.tapshyrmaapp.data.local.database.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -15,5 +15,5 @@ data class TaskModel(
     @ColumnInfo("date_time")
     val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo("is_completed")
-    var isCompleted: Boolean = false
+    val isCompleted: Boolean = false
 )
