@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,14 +32,14 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -51,14 +52,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.tapshyrmaapp.data.database.entity.TaskModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.tapshyrmaapp.data.local.database.entity.TaskModel
 import com.example.tapshyrmaapp.extensions.toFormattedDateTime
 import com.example.tapshyrmaapp.presentation.ui.appbars.TapshyrmaTopBar
-import com.example.tapshyrmaapp.presentation.ui.appbars.TaskFilter
 import com.example.tapshyrmaapp.presentation.ui.floatingbutton.AddTaskFloatingButton
 import com.example.tapshyrmaapp.presentation.ui.floatingbutton.DeleteTaskFloatingButton
-import com.example.tapshyrmaapp.presentation.ui.screens.TaskViewModel
 import com.example.tapshyrmaapp.presentation.ui.theme.BackgroundBurgundy
 import com.example.tapshyrmaapp.presentation.ui.theme.BackgroundMagenta
 import com.example.tapshyrmaapp.presentation.ui.theme.BackgroundRed
@@ -67,87 +67,87 @@ import com.example.tapshyrmaapp.presentation.ui.theme.Typography
 @Composable
 fun HomeScreen(
     toDetailScreen: (Int) -> Unit,
-    taskViewModel: TaskViewModel = viewModel(),
+    viewModel: HomeViewModel = hiltViewModel(),
     onFloatingButtonClick: () -> Unit
 ) {
-    var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
-    var taskToDelete by remember { mutableStateOf<TaskModel?>(null) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    val tasks by when (selectedFilter) {
-        TaskFilter.ALL -> taskViewModel.allTasks.observeAsState(emptyList())
-        TaskFilter.ACTIVE -> taskViewModel.getTasksByStatus(isCompleted = false)
-            .observeAsState(emptyList())
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val event by viewModel.event.collectAsStateWithLifecycle(null)
 
-        TaskFilter.COMPLETED -> taskViewModel.getTasksByStatus(isCompleted = true)
-            .observeAsState(emptyList())
+    LaunchedEffect(event) {
+        when (val e = event) {
+            is TaskListEvent.NavigateToDetail -> {
+                if (e.id == -1) {
+                    onFloatingButtonClick()
+                } else {
+                    toDetailScreen(e.id)
+                }
+            }
+
+            null -> Unit
+        }
     }
-    val areCompletedTasks =
-        taskViewModel.getTasksByStatus(isCompleted = true).observeAsState(emptyList())
 
     Scaffold(
         topBar = {
             TapshyrmaTopBar(
-                onFilterSelected = {
-                    selectedFilter = it
-                }
+                onFilterSelected = viewModel::setFilter
+
             )
         },
         floatingActionButton = {
             Column {
-                if (areCompletedTasks.value.isNotEmpty()) {
-                    DeleteTaskFloatingButton(onClick = {
-                        showDeleteDialog = true
-                    })
+                if (uiState.hasCompleted) {
+                    DeleteTaskFloatingButton(onClick = viewModel::showDeleteCompletedTasksDialog)
                 }
                 Spacer(Modifier.height(12.dp))
-                AddTaskFloatingButton(onFloatingButtonClick)
+                AddTaskFloatingButton(viewModel::onAddTaskClicked)
             }
         }
     ) { innerPadding ->
-        if (tasks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No tasks",
-                    style = TextStyle(
-                        color = Color.Gray,
-                        fontWeight = FontWeight.W400
-                    )
+        when {
+            uiState.isLoading -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding), Alignment.Center
+                ) {
+                    Text("Loading", color = Color.Gray)
+                }
+            }
+
+            uiState.tasks.isEmpty() -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding), Alignment.Center
+                ) {
+                    Text("No tasks", color = Color.Gray)
+                }
+            }
+
+            else -> {
+                TaskList(
+                    modifier = Modifier.padding(innerPadding),
+                    tasks = uiState.tasks,
+                    onClick = viewModel::onTaskClicked,
+                    onUpdate = viewModel::updateTaskCompletedState,
+                    onLongPress = viewModel::showDeleteTaskDialog,
+                    onSwipeRight = viewModel::showDeleteTaskDialog
                 )
             }
-        } else {
-            TaskList(
-                modifier = Modifier.padding(innerPadding),
-                onClick = toDetailScreen,
-                taskModels = tasks,
-                onToggle = { taskViewModel.updateTask(it) },
-                onLongPress = { task ->
-                    taskToDelete = task
-                }
-            )
         }
     }
-    taskToDelete?.let {
+    uiState.showDeleteTaskDialog?.let {
         DeleteTaskAlertDialog(
             taskTitle = it.title,
-            onDismiss = { taskToDelete = null },
-            onConfirm = {
-                taskViewModel.deleteTask(it)
-                taskToDelete = null
-            }
+            onDismiss = viewModel::cancelDeleteTask,
+            onConfirm = viewModel::confirmDeleteTask
         )
     }
-    if (showDeleteDialog) {
+    if (uiState.showDeleteCompletedDialog) {
         DeleteCompletedTasksAlertDialog(
-            onDismiss = { showDeleteDialog = false },
-            onConfirm = {
-                taskViewModel.deleteCompletedTasks()
-                showDeleteDialog = false
-            }
+            onDismiss = viewModel::cancelDeleteCompletedTasks,
+            onConfirm = viewModel::confirmDeleteCompletedTasks
         )
     }
 }
@@ -155,61 +155,99 @@ fun HomeScreen(
 @Composable
 fun TaskList(
     modifier: Modifier,
+    tasks: List<TaskModel>,
     onClick: (Int) -> Unit,
-    taskModels: List<TaskModel>,
-    onToggle: (TaskModel) -> Unit,
-    onLongPress: (TaskModel) -> Unit
+    onUpdate: (TaskModel) -> Unit,
+    onLongPress: (TaskModel) -> Unit,
+    onSwipeRight: (TaskModel) -> Unit
 ) {
-    val animatedBrush = animatedBorderBrush()
     LazyColumn(
         modifier = modifier
             .fillMaxWidth(),
         contentPadding = PaddingValues(bottom = 140.dp)
     ) {
-        items(taskModels) { task ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp)
-                    .padding(horizontal = 8.dp, vertical = 8.dp)
-                    .combinedClickable(
-                        onClick = { onClick(task.id) },
-                        onLongClick = {
-                            onLongPress(task)
-                        }
-                    )
-                    .border(border = BorderStroke(2.dp, animatedBrush), RoundedCornerShape(8.dp)),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    modifier = Modifier.width(200.dp),
-                    overflow = TextOverflow.Ellipsis,
-                    maxLines = 1,
-                    text = task.title,
-                    style = TextStyle(
-                        fontSize = 20.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.W400
-                    ),
-                )
-                Text(
-                    modifier = Modifier.width(100.dp),
-                    text = task.createdAt.toFormattedDateTime(),
-                    style = Typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Checkbox(
-                    checked = task.isCompleted,
-                    onCheckedChange = { isChecked ->
-                        onToggle(task.copy(isCompleted = isChecked))
+        items(tasks) {
+            it.let { task ->
+                val dismissBoxState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = {
+                        onSwipeRight(task)
+                        false
                     },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = BackgroundMagenta,
-                        uncheckedColor = BackgroundMagenta
-                    )
+                    positionalThreshold = { fullWidth ->
+                        fullWidth * 0.5f
+                    }
                 )
+                val direction = dismissBoxState.dismissDirection
+                SwipeToDismissBox(
+                    state = dismissBoxState,
+                    backgroundContent = {
+                        val alignment = when (direction) {
+                            SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                            SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                            else -> Alignment.Center
+                        }
+                        Box(
+                            modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = alignment
+
+                        ) {
+                            Icon(
+                                Icons.Default.Delete, "icon delete",
+                                tint = BackgroundMagenta
+                            )
+                        }
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
+                            .combinedClickable(
+                                onClick = { onClick(task.id) },
+                                onLongClick = {
+                                    onLongPress(task)
+                                }
+                            )
+                            .border(
+                                border = BorderStroke(2.dp, animatedBorderBrush()),
+                                RoundedCornerShape(8.dp)
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            modifier = Modifier.width(200.dp),
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            text = task.title,
+                            style = TextStyle(
+                                fontSize = 20.sp,
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.W400
+                            ),
+                        )
+                        Text(
+                            modifier = Modifier.width(100.dp),
+                            text = task.createdAt.toFormattedDateTime(),
+                            style = Typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Checkbox(
+                            checked = task.isCompleted,
+                            onCheckedChange = { isChecked ->
+                                onUpdate(task.copy(isCompleted = isChecked))
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = BackgroundMagenta,
+                                uncheckedColor = BackgroundMagenta
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -255,7 +293,7 @@ fun DeleteTaskAlertDialog(
         onDismissRequest = { onDismiss() },
         title = {
             Text(
-                "Delete ${taskTitle}?",
+                "Delete task\n\"${taskTitle}\"?",
                 style = TextStyle(
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
