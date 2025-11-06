@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.example.tapshyrmaapp.presentation.ui.screens.home.TaskFilter
 import com.example.tapshyrmaapp.presentation.ui.theme.BackgroundBurgundy
 import com.example.tapshyrmaapp.presentation.ui.theme.BackgroundMagenta
 import com.example.tapshyrmaapp.presentation.ui.theme.BackgroundRed
@@ -83,9 +84,7 @@ fun appBarGradientColor(): Brush {
     return animatedBrush
 }
 
-enum class TaskFilter {
-    ALL, ACTIVE, COMPLETED
-}
+
 
 @Composable
 fun DropMenu(expanded: Boolean, onFilterSelected: (TaskFilter) -> Unit, onDismiss: () -> Unit) {

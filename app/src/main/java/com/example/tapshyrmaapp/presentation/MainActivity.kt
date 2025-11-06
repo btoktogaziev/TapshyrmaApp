@@ -24,7 +24,9 @@ import com.example.tapshyrmaapp.presentation.ui.screens.Screens
 import com.example.tapshyrmaapp.presentation.ui.screens.detail.DetailTaskScreen
 import com.example.tapshyrmaapp.presentation.ui.screens.home.HomeScreen
 import com.example.tapshyrmaapp.presentation.ui.theme.TapshyrmaAppTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,7 +96,9 @@ class MainActivity : ComponentActivity() {
                     val id = backStackEntry.arguments?.getInt("id") ?: -1
                     DetailTaskScreen(
                         id = id,
-                        navController = navController
+                        onBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
             }
